@@ -1,0 +1,1112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Complete Pose Estimation & Hand Tracking</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🤸</text></svg>">
+    
+    <!-- MediaPipe Dependencies -->
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/control_utils/control_utils.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1600px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #ff6b6b 0%, #ee5a24 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+        }
+
+        .header p {
+            font-size: 1.2em;
+            opacity: 0.9;
+        }
+
+        .main-content {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 30px;
+            padding: 40px;
+        }
+
+        .section {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+            transition: transform 0.3s ease;
+        }
+
+        .section:hover {
+            transform: translateY(-5px);
+        }
+
+        .section h2 {
+            color: #2c3e50;
+            margin-bottom: 20px;
+            font-size: 1.8em;
+            border-bottom: 3px solid #3498db;
+            padding-bottom: 10px;
+        }
+
+        .camera-section h2 {
+            border-bottom-color: #e74c3c;
+        }
+
+        .analysis-section h2 {
+            border-bottom-color: #27ae60;
+        }
+
+        .video-container {
+            position: relative;
+            width: 100%;
+            border-radius: 15px;
+            overflow: hidden;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+            background: #000;
+        }
+
+        #video {
+            width: 100%;
+            height: auto;
+            display: block;
+            transform: scaleX(-1); /* Mirror video */
+        }
+
+        #canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 10;
+        }
+
+        .controls-row {
+            display: flex;
+            gap: 10px;
+            margin: 20px 0;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .checkbox-container {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: #f8f9fa;
+            padding: 10px 15px;
+            border-radius: 8px;
+            border: 1px solid #dee2e6;
+        }
+
+        .checkbox-container input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+            accent-color: #00b894;
+        }
+
+        .checkbox-container label {
+            font-weight: 500;
+            color: #2c3e50;
+            cursor: pointer;
+        }
+
+        .controls {
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            background: linear-gradient(135deg, #00b894 0%, #00a085 100%);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            font-size: 16px;
+            font-weight: bold;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            flex: 1;
+            min-width: 120px;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0, 184, 148, 0.4);
+        }
+
+        .btn:disabled {
+            background: #95a5a6;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .btn-secondary {
+            background: linear-gradient(135deg, #fd79a8 0%, #e84393 100%);
+        }
+
+        .btn-secondary:hover {
+            box-shadow: 0 5px 15px rgba(232, 67, 147, 0.4);
+        }
+
+        .btn-danger {
+            background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
+        }
+
+        .btn-danger:hover {
+            box-shadow: 0 5px 15px rgba(231, 76, 60, 0.4);
+        }
+
+        .status {
+            margin-top: 15px;
+            padding: 15px;
+            border-radius: 10px;
+            font-weight: bold;
+            text-align: center;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+            opacity: 1;
+        }
+
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+            opacity: 1;
+        }
+
+        .status.info {
+            background: #cce7ff;
+            color: #004085;
+            border: 1px solid #b3d7ff;
+            opacity: 1;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .stat-card {
+            background: linear-gradient(135deg, #74b9ff 0%, #0984e3 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 2em;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+
+        .stat-label {
+            font-size: 0.9em;
+            opacity: 0.9;
+        }
+
+        .pose-data {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 20px;
+            margin-top: 20px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .pose-data h3 {
+            color: #2c3e50;
+            margin-bottom: 15px;
+            font-size: 1.3em;
+        }
+
+        .landmark-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin: 8px 0;
+            padding: 8px;
+            background: white;
+            border-radius: 5px;
+            font-family: monospace;
+            font-size: 12px;
+        }
+
+        .landmark-name {
+            font-weight: bold;
+            color: #2c3e50;
+            min-width: 120px;
+        }
+
+        .landmark-coords {
+            color: #666;
+        }
+
+        .landmark-confidence {
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: bold;
+        }
+
+        .confidence-high {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .confidence-medium {
+            background: #fff3cd;
+            color: #856404;
+        }
+
+        .confidence-low {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .gesture-display {
+            background: linear-gradient(135deg, #a29bfe 0%, #6c5ce7 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 15px;
+            margin-top: 20px;
+            text-align: center;
+        }
+
+        .gesture-display h3 {
+            margin-bottom: 15px;
+            font-size: 1.5em;
+        }
+
+        .gesture-result {
+            font-size: 1.8em;
+            font-weight: bold;
+            margin: 10px 0;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+        }
+
+        .hand-tracking {
+            background: linear-gradient(135deg, #fdcb6e 0%, #e17055 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 15px;
+            margin-top: 20px;
+        }
+
+        .hand-tracking h3 {
+            margin-bottom: 15px;
+            font-size: 1.5em;
+        }
+
+        .hand-info {
+            margin: 10px 0;
+            padding: 10px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 8px;
+        }
+
+        .performance-info {
+            background: #e8f5e8;
+            border: 1px solid #c3e6cb;
+            border-radius: 10px;
+            padding: 15px;
+            margin-top: 20px;
+        }
+
+        .performance-info h4 {
+            color: #155724;
+            margin-bottom: 10px;
+        }
+
+        .performance-stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+            gap: 10px;
+            font-family: monospace;
+            font-size: 14px;
+        }
+
+        @media (max-width: 1200px) {
+            .main-content {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .main-content {
+                padding: 20px;
+            }
+            
+            .header h1 {
+                font-size: 2em;
+            }
+
+            .controls {
+                flex-direction: column;
+            }
+
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #3498db;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-right: 10px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🤸 Complete Pose Estimation & Hand Tracking</h1>
+            <p>Advanced real-time pose detection with 33 body landmarks and 21 hand landmarks per hand</p>
+        </div>
+
+        <div class="main-content">
+            <!-- Camera and Detection Section -->
+            <div class="section camera-section">
+                <h2>📹 Live Detection</h2>
+                
+                <div class="video-container">
+                    <video id="video" autoplay muted playsinline></video>
+                    <canvas id="canvas"></canvas>
+                </div>
+
+                <div class="controls-row">
+                    <div class="checkbox-container">
+                        <input type="checkbox" id="poseEnabled" checked>
+                        <label for="poseEnabled">🧍 Pose Detection (33 points)</label>
+                    </div>
+                    <div class="checkbox-container">
+                        <input type="checkbox" id="handsEnabled" checked>
+                        <label for="handsEnabled">👐 Hand Tracking (21 points)</label>
+                    </div>
+                    <div class="checkbox-container">
+                        <input type="checkbox" id="connectionsEnabled" checked>
+                        <label for="connectionsEnabled">🔗 Show Connections</label>
+                    </div>
+                </div>
+
+                <div class="controls">
+                    <button class="btn" id="startBtn" onclick="startDetection()">
+                        🎥 Start Detection
+                    </button>
+                    <button class="btn btn-secondary" id="stopBtn" onclick="stopDetection()" disabled>
+                        ⏹️ Stop Detection
+                    </button>
+                    <button class="btn btn-danger" onclick="captureFrame()">
+                        📸 Capture
+                    </button>
+                    <button class="btn btn-secondary" onclick="toggleFullscreen()">
+                        📺 Fullscreen
+                    </button>
+                </div>
+
+                <div id="cameraStatus" class="status"></div>
+
+                <div class="performance-info">
+                    <h4>📊 Performance Monitor</h4>
+                    <div class="performance-stats">
+                        <div>FPS: <span id="fpsCounter">0</span></div>
+                        <div>Pose: <span id="poseStatus">❌</span></div>
+                        <div>Hands: <span id="handsStatus">❌</span></div>
+                        <div>Latency: <span id="latencyCounter">0ms</span></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Analysis Section -->
+            <div class="section analysis-section">
+                <h2>📊 Real-time Analysis</h2>
+
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-value" id="poseConfidence">0%</div>
+                        <div class="stat-label">Pose Confidence</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="handCount">0</div>
+                        <div class="stat-label">Hands Detected</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="keypointCount">0</div>
+                        <div class="stat-label">Total Keypoints</div>
+                    </div>
+                </div>
+
+                <!-- Gesture Recognition -->
+                <div class="gesture-display">
+                    <h3>🤖 Gesture Recognition</h3>
+                    <div class="gesture-result" id="gestureResult">No gesture detected</div>
+                </div>
+
+                <!-- Hand Tracking Info -->
+                <div class="hand-tracking" id="handTrackingInfo" style="display: none;">
+                    <h3>👐 Hand Analysis</h3>
+                    <div id="handDetails">No hands detected</div>
+                </div>
+
+                <!-- Pose Landmarks -->
+                <div class="pose-data">
+                    <h3>📍 Pose Landmarks (33 points)</h3>
+                    <div id="poseData">No pose data available</div>
+                </div>
+
+                <div id="analysisStatus" class="status"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Global variables
+        let camera;
+        let pose;
+        let hands;
+        let video;
+        let canvas;
+        let ctx;
+        let isRunning = false;
+        let lastFrameTime = 0;
+        let frameCount = 0;
+        let fps = 0;
+        let currentPose = null;
+        let currentHands = [];
+        let gestureHistory = [];
+
+        // MediaPipe pose connections (33 landmarks)
+        const POSE_CONNECTIONS = [
+            [0, 1], [1, 2], [2, 3], [3, 7], [0, 4], [4, 5], [5, 6], [6, 8], [9, 10],
+            [11, 12], [11, 13], [13, 15], [15, 17], [15, 19], [15, 21], [17, 19],
+            [12, 14], [14, 16], [16, 18], [16, 20], [16, 22], [18, 20], [11, 23],
+            [12, 24], [23, 24], [23, 25], [25, 27], [27, 29], [29, 31], [27, 31],
+            [24, 26], [26, 28], [28, 30], [30, 32], [28, 32]
+        ];
+
+        // Hand connections (21 landmarks per hand)
+        const HAND_CONNECTIONS = [
+            [0, 1], [1, 2], [2, 3], [3, 4],      // Thumb
+            [0, 5], [5, 6], [6, 7], [7, 8],      // Index finger
+            [5, 9], [9, 10], [10, 11], [11, 12], // Middle finger
+            [9, 13], [13, 14], [14, 15], [15, 16], // Ring finger
+            [13, 17], [17, 18], [18, 19], [19, 20], // Pinky
+            [0, 17]                               // Palm
+        ];
+
+        // Pose landmark names
+        const POSE_LANDMARKS = [
+            'nose', 'left_eye_inner', 'left_eye', 'left_eye_outer', 'right_eye_inner',
+            'right_eye', 'right_eye_outer', 'left_ear', 'right_ear', 'mouth_left',
+            'mouth_right', 'left_shoulder', 'right_shoulder', 'left_elbow', 'right_elbow',
+            'left_wrist', 'right_wrist', 'left_pinky', 'right_pinky', 'left_index',
+            'right_index', 'left_thumb', 'right_thumb', 'left_hip', 'right_hip',
+            'left_knee', 'right_knee', 'left_ankle', 'right_ankle', 'left_heel',
+            'right_heel', 'left_foot_index', 'right_foot_index'
+        ];
+
+        // Hand landmark names
+        const HAND_LANDMARKS = [
+            'wrist', 'thumb_cmc', 'thumb_mcp', 'thumb_ip', 'thumb_tip',
+            'index_finger_mcp', 'index_finger_pip', 'index_finger_dip', 'index_finger_tip',
+            'middle_finger_mcp', 'middle_finger_pip', 'middle_finger_dip', 'middle_finger_tip',
+            'ring_finger_mcp', 'ring_finger_pip', 'ring_finger_dip', 'ring_finger_tip',
+            'pinky_mcp', 'pinky_pip', 'pinky_dip', 'pinky_tip'
+        ];
+
+        // Initialize MediaPipe models
+        async function initializeModels() {
+            console.log('🔧 Initializing MediaPipe models...');
+            showStatus('analysisStatus', 'Loading MediaPipe models...', 'info');
+            
+            try {
+                // Initialize video element
+                video = document.getElementById('video');
+                canvas = document.getElementById('canvas');
+                ctx = canvas.getContext('2d');
+
+                // Initialize Pose model
+                pose = new Pose({
+                    locateFile: (file) => {
+                        return `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}`;
+                    }
+                });
+
+                pose.setOptions({
+                    modelComplexity: 1,
+                    smoothLandmarks: true,
+                    enableSegmentation: false,
+                    smoothSegmentation: true,
+                    minDetectionConfidence: 0.5,
+                    minTrackingConfidence: 0.5
+                });
+
+                pose.onResults(onPoseResults);
+
+                // Initialize Hands model
+                hands = new Hands({
+                    locateFile: (file) => {
+                        return `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`;
+                    }
+                });
+
+                hands.setOptions({
+                    maxNumHands: 2,
+                    modelComplexity: 1,
+                    minDetectionConfidence: 0.7,
+                    minTrackingConfidence: 0.5
+                });
+
+                hands.onResults(onHandsResults);
+
+                console.log('✅ MediaPipe models initialized successfully!');
+                showStatus('analysisStatus', '✅ Models loaded! Ready to start detection.', 'success');
+                
+                return true;
+            } catch (error) {
+                console.error('❌ Model initialization error:', error);
+                showStatus('analysisStatus', 'Error: ' + error.message, 'error');
+                return false;
+            }
+        }
+
+        // Start detection
+        async function startDetection() {
+            if (isRunning) return;
+
+            try {
+                showStatus('cameraStatus', 'Starting camera...', 'info');
+                
+                // Initialize models if not done
+                if (!pose || !hands) {
+                    const success = await initializeModels();
+                    if (!success) return;
+                }
+
+                // Initialize camera
+                camera = new Camera(video, {
+                    onFrame: async () => {
+                        if (isRunning) {
+                            await processFrame();
+                        }
+                    },
+                    width: 1280,
+                    height: 720
+                });
+
+                await camera.start();
+
+                // Setup canvas
+                canvas.width = video.videoWidth || 1280;
+                canvas.height = video.videoHeight || 720;
+
+                isRunning = true;
+                document.getElementById('startBtn').disabled = true;
+                document.getElementById('stopBtn').disabled = false;
+                
+                showStatus('cameraStatus', '✅ Detection started! AI models active.', 'success');
+                document.getElementById('poseStatus').textContent = '✅';
+                document.getElementById('handsStatus').textContent = '✅';
+                
+            } catch (error) {
+                console.error('Camera error:', error);
+                showStatus('cameraStatus', 'Camera error: ' + error.message, 'error');
+            }
+        }
+
+        // Process each frame
+        async function processFrame() {
+            const startTime = performance.now();
+            
+            try {
+                // Send frame to pose detection
+                if (document.getElementById('poseEnabled').checked) {
+                    await pose.send({image: video});
+                }
+
+                // Send frame to hand detection
+                if (document.getElementById('handsEnabled').checked) {
+                    await hands.send({image: video});
+                }
+
+                // Calculate performance metrics
+                const endTime = performance.now();
+                const processingTime = endTime - startTime;
+                
+                updatePerformanceMetrics(processingTime);
+                
+            } catch (error) {
+                console.error('Frame processing error:', error);
+            }
+        }
+
+        // Handle pose detection results
+        function onPoseResults(results) {
+            currentPose = results;
+            
+            if (results.poseLandmarks) {
+                // Update pose confidence
+                const avgConfidence = calculatePoseConfidence(results.poseLandmarks);
+                document.getElementById('poseConfidence').textContent = Math.round(avgConfidence * 100) + '%';
+                
+                // Update landmark count
+                const validLandmarks = results.poseLandmarks.length;
+                document.getElementById('keypointCount').textContent = validLandmarks;
+                
+                // Update pose data display
+                updatePoseDataDisplay(results.poseLandmarks);
+            }
+            
+            // Draw results
+            drawResults();
+        }
+
+        // Handle hand detection results
+        function onHandsResults(results) {
+            currentHands = results.multiHandLandmarks || [];
+            
+            // Update hand count
+            document.getElementById('handCount').textContent = currentHands.length;
+            
+            if (currentHands.length > 0) {
+                document.getElementById('handTrackingInfo').style.display = 'block';
+                updateHandDisplay(results);
+                
+                // Gesture recognition
+                const gesture = recognizeGesture(results);
+                document.getElementById('gestureResult').textContent = gesture;
+            } else {
+                document.getElementById('handTrackingInfo').style.display = 'none';
+                document.getElementById('gestureResult').textContent = 'No hands detected';
+            }
+            
+            // Draw results
+            drawResults();
+        }
+
+        // Draw all results on canvas
+        function drawResults() {
+            if (!ctx) return;
+            
+            // Clear canvas
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // Mirror the canvas drawing to match video
+            ctx.save();
+            ctx.scale(-1, 1);
+            ctx.translate(-canvas.width, 0);
+            
+            const showConnections = document.getElementById('connectionsEnabled').checked;
+            
+            // Draw pose
+            if (currentPose && currentPose.poseLandmarks && document.getElementById('poseEnabled').checked) {
+                drawPose(currentPose.poseLandmarks, showConnections);
+            }
+            
+            // Draw hands
+            if (currentHands.length > 0 && document.getElementById('handsEnabled').checked) {
+                currentHands.forEach((handLandmarks, index) => {
+                    drawHand(handLandmarks, showConnections, index);
+                });
+            }
+            
+            ctx.restore();
+        }
+
+        // Draw pose landmarks and connections
+        function drawPose(landmarks, showConnections) {
+            const width = canvas.width;
+            const height = canvas.height;
+            
+            // Draw connections
+            if (showConnections) {
+                ctx.strokeStyle = '#00ff00';
+                ctx.lineWidth = 3;
+                ctx.beginPath();
+                
+                POSE_CONNECTIONS.forEach(([startIdx, endIdx]) => {
+                    const start = landmarks[startIdx];
+                    const end = landmarks[endIdx];
+                    
+                    if (start && end && start.visibility > 0.5 && end.visibility > 0.5) {
+                        ctx.moveTo(start.x * width, start.y * height);
+                        ctx.lineTo(end.x * width, end.y * height);
+                    }
+                });
+                
+                ctx.stroke();
+            }
+            
+            // Draw landmarks
+            landmarks.forEach((landmark, index) => {
+                if (landmark.visibility > 0.5) {
+                    const x = landmark.x * width;
+                    const y = landmark.y * height;
+                    
+                    // Different colors for different body parts
+                    if (index < 11) {
+                        ctx.fillStyle = '#ff0000'; // Head/face
+                    } else if (index < 17) {
+                        ctx.fillStyle = '#00ff00'; // Arms
+                    } else if (index < 23) {
+                        ctx.fillStyle = '#0000ff'; // Hands
+                    } else {
+                        ctx.fillStyle = '#ffff00'; // Body/legs
+                    }
+                    
+                    ctx.beginPath();
+                    ctx.arc(x, y, 6, 0, 2 * Math.PI);
+                    ctx.fill();
+                    
+                    // Add white border
+                    ctx.strokeStyle = '#ffffff';
+                    ctx.lineWidth = 2;
+                    ctx.stroke();
+                }
+            });
+        }
+
+        // Draw hand landmarks and connections
+        function drawHand(landmarks, showConnections, handIndex) {
+            const width = canvas.width;
+            const height = canvas.height;
+            
+            // Different colors for left/right hand
+            const handColor = handIndex === 0 ? '#ff6b6b' : '#4ecdc4';
+            
+            // Draw connections
+            if (showConnections) {
+                ctx.strokeStyle = handColor;
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                
+                HAND_CONNECTIONS.forEach(([startIdx, endIdx]) => {
+                    const start = landmarks[startIdx];
+                    const end = landmarks[endIdx];
+                    
+                    if (start && end) {
+                        ctx.moveTo(start.x * width, start.y * height);
+                        ctx.lineTo(end.x * width, end.y * height);
+                    }
+                });
+                
+                ctx.stroke();
+            }
+            
+            // Draw landmarks
+            landmarks.forEach((landmark, index) => {
+                const x = landmark.x * width;
+                const y = landmark.y * height;
+                
+                ctx.fillStyle = handColor;
+                ctx.beginPath();
+                ctx.arc(x, y, 4, 0, 2 * Math.PI);
+                ctx.fill();
+                
+                // Add white border
+                ctx.strokeStyle = '#ffffff';
+                ctx.lineWidth = 1;
+                ctx.stroke();
+            });
+        }
+
+        // Calculate pose confidence
+        function calculatePoseConfidence(landmarks) {
+            const visibleLandmarks = landmarks.filter(l => l.visibility > 0.5);
+            if (visibleLandmarks.length === 0) return 0;
+            
+            const avgVisibility = visibleLandmarks.reduce((sum, l) => sum + l.visibility, 0) / visibleLandmarks.length;
+            return avgVisibility;
+        }
+
+        // Update pose data display
+        function updatePoseDataDisplay(landmarks) {
+            let html = '';
+            
+            landmarks.forEach((landmark, index) => {
+                if (landmark.visibility > 0.1) {
+                    const confidence = Math.round(landmark.visibility * 100);
+                    const confidenceClass = confidence > 70 ? 'confidence-high' : 
+                                          confidence > 40 ? 'confidence-medium' : 'confidence-low';
+                    
+                    html += `
+                        <div class="landmark-item">
+                            <span class="landmark-name">${POSE_LANDMARKS[index] || `Point ${index}`}</span>
+                            <span class="landmark-coords">x:${Math.round(landmark.x * 1000)}, y:${Math.round(landmark.y * 1000)}, z:${Math.round(landmark.z * 1000)}</span>
+                            <span class="landmark-confidence ${confidenceClass}">${confidence}%</span>
+                        </div>
+                    `;
+                }
+            });
+            
+            document.getElementById('poseData').innerHTML = html || 'No pose landmarks detected';
+        }
+
+        // Update hand display
+        function updateHandDisplay(results) {
+            let html = '';
+            
+            if (results.multiHandLandmarks && results.multiHandedness) {
+                results.multiHandLandmarks.forEach((landmarks, index) => {
+                    const handedness = results.multiHandedness[index];
+                    const label = handedness.label;
+                    const score = Math.round(handedness.score * 100);
+                    
+                    html += `
+                        <div class="hand-info">
+                            <strong>${label} Hand (${score}% confidence)</strong><br>
+                            Landmarks: ${landmarks.length}/21<br>
+                            Gesture: ${analyzeHandGesture(landmarks)}
+                        </div>
+                    `;
+                });
+            }
+            
+            document.getElementById('handDetails').innerHTML = html || 'No hands detected';
+        }
+
+        // Analyze hand gesture
+        function analyzeHandGesture(landmarks) {
+            if (!landmarks || landmarks.length < 21) return 'Unknown';
+            
+            // Simple gesture recognition based on finger positions
+            const fingers = [];
+            
+            // Thumb
+            fingers.push(landmarks[4].x > landmarks[3].x);
+            
+            // Other fingers
+            for (let i = 1; i <= 4; i++) {
+                const tipIdx = i * 4;
+                const pipIdx = tipIdx - 2;
+                fingers.push(landmarks[tipIdx].y < landmarks[pipIdx].y);
+            }
+            
+            const extendedFingers = fingers.filter(f => f).length;
+            
+            switch (extendedFingers) {
+                case 0: return 'Fist ✊';
+                case 1: return 'One Finger ☝️';
+                case 2: return 'Peace/Two ✌️';
+                case 3: return 'Three 🤟';
+                case 4: return 'Four 🤚';
+                case 5: return 'Open Hand ✋';
+                default: return 'Unknown';
+            }
+        }
+
+        // Recognize gesture from pose and hands
+        function recognizeGesture(results) {
+            if (!currentPose || !currentPose.poseLandmarks) return 'No gesture';
+            
+            const pose = currentPose.poseLandmarks;
+            const hands = results.multiHandLandmarks || [];
+            
+            // Arms up gesture
+            if (pose[11] && pose[12] && pose[15] && pose[16]) {
+                const leftShoulderY = pose[11].y;
+                const rightShoulderY = pose[12].y;
+                const leftWristY = pose[15].y;
+                const rightWristY = pose[16].y;
+                
+                if (leftWristY < leftShoulderY && rightWristY < rightShoulderY) {
+                    return 'Arms Up! 🙌';
+                }
+            }
+            
+            // Waving (one hand up)
+            if (hands.length === 1) {
+                const gesture = analyzeHandGesture(hands[0]);
+                if (gesture.includes('Open Hand')) {
+                    return 'Waving 👋';
+                }
+            }
+            
+            // Thumbs up detection would require more sophisticated analysis
+            if (hands.length > 0) {
+                for (let hand of hands) {
+                    const gesture = analyzeHandGesture(hand);
+                    if (gesture.includes('One Finger')) {
+                        return 'Pointing 👉';
+                    }
+                }
+            }
+            
+            return 'Pose detected 🧍';
+        }
+
+        // Update performance metrics
+        function updatePerformanceMetrics(processingTime) {
+            frameCount++;
+            const now = performance.now();
+            
+            if (now - lastFrameTime >= 1000) {
+                fps = Math.round((frameCount * 1000) / (now - lastFrameTime));
+                frameCount = 0;
+                lastFrameTime = now;
+                
+                document.getElementById('fpsCounter').textContent = fps;
+            }
+            
+            document.getElementById('latencyCounter').textContent = Math.round(processingTime) + 'ms';
+        }
+
+        // Stop detection
+        function stopDetection() {
+            try {
+                isRunning = false;
+                
+                if (camera) {
+                    camera.stop();
+                }
+                
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                
+                document.getElementById('startBtn').disabled = false;
+                document.getElementById('stopBtn').disabled = true;
+                
+                document.getElementById('poseStatus').textContent = '❌';
+                document.getElementById('handsStatus').textContent = '❌';
+                document.getElementById('fpsCounter').textContent = '0';
+                document.getElementById('latencyCounter').textContent = '0ms';
+                
+                showStatus('cameraStatus', 'Detection stopped.', 'info');
+                
+            } catch (error) {
+                console.error('Error stopping detection:', error);
+            }
+        }
+
+        // Capture frame
+        function captureFrame() {
+            if (!isRunning) {
+                showStatus('cameraStatus', 'Start detection first!', 'error');
+                return;
+            }
+
+            const link = document.createElement('a');
+            link.download = `pose-capture-${Date.now()}.png`;
+            link.href = canvas.toDataURL();
+            link.click();
+            
+            showStatus('cameraStatus', '✅ Frame captured and downloaded!', 'success');
+        }
+
+        // Toggle fullscreen
+        function toggleFullscreen() {
+            try {
+                if (document.fullscreenElement) {
+                    document.exitFullscreen();
+                } else {
+                    document.documentElement.requestFullscreen();
+                }
+                showStatus('cameraStatus', 'Fullscreen toggled!', 'success');
+            } catch (error) {
+                console.error('Error toggling fullscreen:', error);
+                showStatus('cameraStatus', 'Fullscreen not supported', 'error');
+            }
+        }
+
+        // Show status message
+        function showStatus(elementId, message, type) {
+            try {
+                const element = document.getElementById(elementId);
+                element.textContent = message;
+                element.className = `status ${type}`;
+                
+                if (type === 'success') {
+                    setTimeout(() => {
+                        element.style.opacity = '0';
+                    }, 3000);
+                }
+            } catch (error) {
+                console.error('Error showing status:', error);
+            }
+        }
+
+        // Initialize when page loads
+        window.addEventListener('load', async () => {
+            console.log('🚀 Starting Complete Pose Estimation & Hand Tracking!');
+            console.log('Page loaded, initializing...');
+            
+            // Small delay to ensure all resources are loaded
+            setTimeout(async () => {
+                await initializeModels();
+            }, 1000);
+        });
+
+        // Handle page unload
+        window.addEventListener('beforeunload', () => {
+            stopDetection();
+        });
+
+        // Handle checkbox changes
+        document.getElementById('poseEnabled').addEventListener('change', (e) => {
+            console.log('Pose detection:', e.target.checked ? 'enabled' : 'disabled');
+        });
+
+        document.getElementById('handsEnabled').addEventListener('change', (e) => {
+            console.log('Hand tracking:', e.target.checked ? 'enabled' : 'disabled');
+        });
+
+        document.getElementById('connectionsEnabled').addEventListener('change', (e) => {
+            console.log('Connections:', e.target.checked ? 'enabled' : 'disabled');
+        });
+    </script>
+</body>
+</html>

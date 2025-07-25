@@ -1,0 +1,41 @@
+{
+  "timestamp": "2025-07-25 20:06:46",
+  "summary": {
+    "total_tests": 5,
+    "passed_tests": 4,
+    "success_rate": 80.0
+  },
+  "detailed_results": {
+    "landmark_detection": {
+      "detection_rate": 100.0,
+      "total_frames": 105,
+      "detected_frames": 105,
+      "status": "PASS"
+    },
+    "feature_extraction": {
+      "features_extracted": 13,
+      "expected_features": 9,
+      "missing_features": [],
+      "status": "PASS"
+    },
+    "performance": {
+      "average_fps": 33.11477750632577,
+      "average_process_time_ms": 23.445654723603848,
+      "status": "PASS"
+    },
+    "accuracy": {
+      "overall_accuracy": 66.66666666666667,
+      "individual_scores": [
+        100.0,
+        50.0,
+        50.0
+      ],
+      "status": "FAIL"
+    },
+    "stability": {
+      "detection_rate_std": 0.0,
+      "processing_time_std": 0.0016988171221111428,
+      "status": "PASS"
+    }
+  }
+}

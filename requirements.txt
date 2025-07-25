@@ -1,0 +1,47 @@
+# Complete Pose Estimation & Hand Tracking Requirements
+# ====================================================
+
+# Core MediaPipe for pose and hand tracking
+mediapipe>=0.10.0
+
+# Computer Vision and Image Processing
+opencv-python>=4.8.0
+numpy>=1.21.0
+
+# Additional ML/AI Libraries
+tensorflow>=2.12.0
+scikit-learn>=1.3.0
+
+# Web Framework (optional, for Flask server)
+flask>=2.3.0
+flask-cors>=4.0.0
+
+# Data Processing and Visualization
+pandas>=1.5.0
+matplotlib>=3.7.0
+seaborn>=0.12.0
+
+# Math and Scientific Computing
+scipy>=1.11.0
+
+# Performance and Utilities
+pillow>=10.0.0
+python-dotenv>=1.0.0
+
+# Development and Testing
+pytest>=7.4.0
+pytest-cov>=4.1.0
+
+# JSON and Configuration
+pyyaml>=6.0
+
+# Progress Bars and CLI
+tqdm>=4.65.0
+click>=8.1.0
+
+# Optional: Jupyter for notebooks
+jupyter>=1.0.0
+ipywidgets>=8.0.0
+
+# Optional: Advanced pose analysis
+filterpy>=1.4.5  # For Kalman filtering/smoothing 
